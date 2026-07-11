@@ -1,0 +1,19 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+*.tfvars
+!example.tfvars
+
+# Go
+apps/demo-app/demo-app
+
+# local tooling
+.claude/settings.local.json
+
+# misc
+.DS_Store
+*.swp

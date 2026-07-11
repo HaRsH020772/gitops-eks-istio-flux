@@ -1,0 +1,74 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: demo-app
+  namespace: flux-system
+spec:
+  image: ghcr.io/harsh020772/demo-app
+  interval: 2m
+---
+# staging follows the latest main build: tags look like
+# main-<shortsha>-<YYYYMMDDHHmmss>, sorted by the timestamp part
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: demo-app-staging
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: demo-app
+  filterTags:
+    pattern: '^main-[a-f0-9]+-(?P<ts>[0-9]+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+# production only follows released semver tags (pushed by release.yaml
+# when a vX.Y.Z git tag is cut)
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: demo-app-production
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: demo-app
+  policy:
+    semver:
+      range: ">=1.0.0"
+---
+# rewrites the tags at the {"$imagepolicy": ...} markers under
+# kubernetes/apps and pushes the commit back to main
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: demo-app
+  namespace: flux-system
+spec:
+  interval: 5m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        email: fluxcdbot@users.noreply.github.com
+        name: fluxcdbot
+      messageTemplate: |
+        chore(flux): automated image update
+
+        {{ range $resource, $changes := .Changed.Objects -}}
+        {{ $resource.Kind }}/{{ $resource.Name }}:
+        {{- range $_, $change := $changes }}
+          {{ $change.OldValue }} -> {{ $change.NewValue }}
+        {{- end }}
+        {{ end -}}
+    push:
+      branch: main
+  update:
+    path: ./kubernetes/apps
+    strategy: Setters

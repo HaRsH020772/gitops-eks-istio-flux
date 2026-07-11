@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    # opt this namespace into the Istio sidecar mesh
+    istio-injection: enabled

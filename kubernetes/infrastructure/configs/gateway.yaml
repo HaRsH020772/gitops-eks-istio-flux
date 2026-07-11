@@ -1,0 +1,20 @@
+# Istio watches this Gateway and auto-provisions an envoy deployment plus a
+# LoadBalancer Service (an AWS NLB via the annotation below). No
+# istio-ingressgateway chart needed.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: public-gateway
+  namespace: istio-ingress
+spec:
+  gatewayClassName: istio
+  infrastructure:
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
