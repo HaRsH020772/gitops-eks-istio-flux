@@ -1,5 +1,7 @@
 # --- Build stage ---------------------------------------------------------
-FROM golang:1.24-alpine AS build
+# 1.26: Go lines 1.24/1.25 carry HIGH stdlib CVEs (fixed in 1.25.12/1.26.5+)
+# that Trivy flags in the compiled binary and the CI gate rejects.
+FROM golang:1.26-alpine AS build
 
 WORKDIR /src
 
