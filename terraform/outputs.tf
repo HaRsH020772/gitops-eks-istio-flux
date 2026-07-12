@@ -19,6 +19,11 @@ output "image_reflector_role_arn" {
   value       = module.image_reflector_irsa.iam_role_arn
 }
 
+output "ecr_repository_url" {
+  description = "Push/pull URI for the demo-app image"
+  value       = aws_ecr_repository.demo_app.repository_url
+}
+
 output "configure_kubectl" {
   description = "Run this to point kubectl at the new cluster"
   value       = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"

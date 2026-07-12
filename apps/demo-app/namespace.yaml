@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-app
+  labels:
+    # Sidecar injection: app pods join the Istio mesh.
+    istio-injection: enabled

@@ -1,0 +1,21 @@
+# The cluster's public entry point (Gateway API). The `addresses` field
+# attaches this Gateway to the existing envoy Deployment/Service installed
+# by the istio-gateway HelmRelease (Istio "manual deployment" mode) instead
+# of letting istiod auto-provision a second gateway deployment.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: public-gateway
+  namespace: istio-ingress
+spec:
+  gatewayClassName: istio
+  addresses:
+    - type: Hostname
+      value: istio-gateway.istio-ingress.svc.cluster.local
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
