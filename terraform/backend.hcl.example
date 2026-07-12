@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) and fill in your account ID — or just
+# paste the `backend_hcl` output from the backend-bootstrap stack.
+bucket         = "weekend-eks-tfstate-<account_name>"
+key            = "weekend-eks/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "weekend-eks-tf-lock"
+encrypt        = true

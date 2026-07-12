@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: staging
-  labels:
-    # opt this namespace into the Istio sidecar mesh
-    istio-injection: enabled

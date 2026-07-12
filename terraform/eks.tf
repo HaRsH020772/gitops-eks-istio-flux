@@ -11,6 +11,10 @@ module "eks" {
   # becomes cluster admin.
   enable_cluster_creator_admin_permissions = true
 
+  # OIDC provider for IRSA — consumed by irsa.tf now, and by anything else
+  # that needs pod-level AWS permissions later.
+  enable_irsa = true
+
   addons = {
     coredns    = {}
     kube-proxy = {}
@@ -21,17 +25,29 @@ module "eks" {
   }
 
   vpc_id                   = module.vpc.vpc_id
-  subnet_ids               = module.vpc.public_subnets
-  control_plane_subnet_ids = module.vpc.public_subnets
+  subnet_ids               = module.vpc.private_subnets
+  control_plane_subnet_ids = module.vpc.private_subnets
 
   eks_managed_node_groups = {
-    default = {
+    # Steady baseline for things that shouldn't be interrupted:
+    # Flux controllers, istiod, CoreDNS.
+    on_demand = {
+      instance_types = var.node_instance_types
+      capacity_type  = "ON_DEMAND"
+
+      min_size     = var.on_demand_node_group.min_size
+      max_size     = var.on_demand_node_group.max_size
+      desired_size = var.on_demand_node_group.desired_size
+    }
+
+    # Cheap burst capacity for app workloads; interruptions are fine there.
+    spot = {
       instance_types = var.node_instance_types
       capacity_type  = "SPOT"
 
-      min_size     = var.node_min_size
-      max_size     = var.node_max_size
-      desired_size = var.node_desired_size
+      min_size     = var.spot_node_group.min_size
+      max_size     = var.spot_node_group.max_size
+      desired_size = var.spot_node_group.desired_size
     }
   }
 
