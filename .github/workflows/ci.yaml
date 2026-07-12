@@ -75,7 +75,7 @@ jobs:
         run: docker build --build-arg VERSION="${TAG}" -t "${IMAGE}" app/
 
       - name: Trivy scan (gate — no push on CRITICAL/HIGH)
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE }}
           format: table
