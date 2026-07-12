@@ -19,6 +19,11 @@ output "image_reflector_role_arn" {
   value       = module.image_reflector_irsa.iam_role_arn
 }
 
+output "github_actions_role_arn" {
+  description = "IAM role GitHub Actions assumes via OIDC to push to ECR"
+  value       = aws_iam_role.github_actions_ecr_push.arn
+}
+
 output "ecr_repository_url" {
   description = "Push/pull URI for the demo-app image"
   value       = aws_ecr_repository.demo_app.repository_url

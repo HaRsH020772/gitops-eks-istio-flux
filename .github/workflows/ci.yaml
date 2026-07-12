@@ -1,0 +1,96 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    # Only app changes build images. Critically, this excludes
+    # apps/demo-app/deployment.yaml — otherwise Flux's own image-bump
+    # commits (Phase 8) would trigger builds forever.
+    paths:
+      - "app/**"
+      - ".github/workflows/ci.yaml"
+  pull_request:
+    paths:
+      - "app/**"
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 989237246761.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: demo-app
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: app/go.mod
+          # stdlib-only module: no go.sum exists for the cache to key on
+          cache: false
+
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -v ./...
+
+  build-sign-push:
+    # Only real main-branch commits publish images; PRs stop at tests.
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token: assumes the AWS role AND signs with cosign
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image tag
+        # main-<sha>-<unix-time>: unique per build, and the trailing number
+        # gives Flux's ImagePolicy (Phase 8) a monotonic sort key.
+        run: |
+          TAG="main-${GITHUB_SHA::7}-$(date +%s)"
+          echo "TAG=${TAG}" >> "$GITHUB_ENV"
+          echo "IMAGE=${ECR_REGISTRY}/${ECR_REPOSITORY}:${TAG}" >> "$GITHUB_ENV"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::989237246761:role/github-actions-ecr-push
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build image
+        run: docker build --build-arg VERSION="${TAG}" -t "${IMAGE}" app/
+
+      - name: Trivy scan (gate — no push on CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Push to ECR
+        run: |
+          docker push "${IMAGE}"
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE}")
+          echo "DIGEST=${DIGEST}" >> "$GITHUB_ENV"
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image (keyless, by digest)
+        run: cosign sign --yes "${DIGEST}"
