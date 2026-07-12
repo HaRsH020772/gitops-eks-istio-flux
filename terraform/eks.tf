@@ -28,6 +28,20 @@ module "eks" {
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
 
+  # The API server must reach istiod's sidecar-injection webhook (targetPort
+  # 15017); the module's default node SG only opens the standard ports, which
+  # blocks pod creation for anything injection-annotated.
+  node_security_group_additional_rules = {
+    ingress_cluster_to_istiod_webhook = {
+      description                   = "API server to istiod injection/validation webhook"
+      protocol                      = "tcp"
+      from_port                     = 15017
+      to_port                       = 15017
+      type                          = "ingress"
+      source_cluster_security_group = true
+    }
+  }
+
   eks_managed_node_groups = {
     # Steady baseline for things that shouldn't be interrupted:
     # Flux controllers, istiod, CoreDNS.
