@@ -1,0 +1,22 @@
+# One alert covering everything Flux manages: all Kustomizations (they all
+# live in flux-system) and all HelmReleases in their respective namespaces.
+# severity: info = successes AND failures — chatty, but for a demo you want
+# to SEE the machinery; switch to `error` when the novelty wears off.
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: cluster-events
+  namespace: flux-system
+spec:
+  providerRef:
+    name: slack
+  eventSeverity: info
+  eventSources:
+    - kind: Kustomization
+      name: "*"
+    - kind: HelmRelease
+      namespace: istio-system
+      name: "*"
+    - kind: HelmRelease
+      namespace: istio-ingress
+      name: "*"

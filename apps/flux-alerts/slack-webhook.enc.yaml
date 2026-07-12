@@ -1,0 +1,27 @@
+# REPLACE the address below with your real Slack webhook URL, then encrypt
+# IN PLACE before committing:
+#   sops --encrypt --in-place apps/flux-alerts/slack-webhook.enc.yaml
+# The .enc.yaml suffix matches .sops.yaml's creation rule; after encryption
+# only the stringData value is ciphertext.
+apiVersion: v1
+kind: Secret
+metadata:
+    name: slack-webhook
+    namespace: flux-system
+stringData:
+    address: ENC[AES256_GCM,data:8J4O9rrvaorGoLYIQP83zO1afynEtt+DJXanqjcbIjtZatUqbUHSNIzTf2I4D05wjWoGOh51jWX5oH5VNMG8LFCbe9qQ02JebI5CvoTmOsjz,iv:ux0YTmc0KT/Y1L19cPR7/OoaO/rua44lO9ITl9mV78g=,tag:T7DcDEZF3YHl0G8m2XJpdQ==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBLWGJUWFA4UlJxMWZyT1c1
+            UThYTWRFUkxUSW5HNVFOTnpGS0NMZGR5UlVnCkVuTGlYMW9TZzJ0dWpjaHRiQlZ2
+            M04zYkxnazh4UVFaRk1ROVVzL1NQb0kKLS0tIHY5OUFKZ20zN1hWOG13eGk2YzB5
+            V1ROdkVuWHZxSDFnQndON1BXc0NKaDAKuFbq9k9tOhQd3GW0cR23/pBa/uNHOGP6
+            kd8VMfsE4RmxreuwdIhDfS6liAD7TiaxoDY3VU3zdCBP5f6K/IN6Gw==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1jsurcffsvmm0kxlee4pckxun4qep4qtw88g2qhelah3djt3my4uqrrlut7
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-07-12T13:17:44Z"
+    mac: ENC[AES256_GCM,data:OczctmRrYeIXXzsGTzrczKhY3jItscOsozMoAfB/+m+sCcxv1XgHb+KhZQvKZkAJI7pf4zV15J21XeQKBLAEnedun/M4IeT6Y01WWDPuxGbQoiVMuI/sxYCunh6ejd2XRYXn2BSw6cgmkxXpReXp6kaQUO5CpJtbwUTQIGiKIjA=,iv:yoacRSgg65tEtpvBTlpgyhxVX1WDLFuo+0DMb03+PWw=,tag:gk5FbOLdpJnjQJTjjUHcqQ==,type:str]
+    version: 3.13.2
