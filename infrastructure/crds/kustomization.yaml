@@ -1,0 +1,7 @@
+# Gateway API v1.6.0 standard-channel CRDs, vendored from
+# https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.0/standard-install.yaml
+# Istio implements Gateway API but does not ship these CRDs itself.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gateway-api-standard-install.yaml

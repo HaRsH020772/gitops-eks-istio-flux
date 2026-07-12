@@ -1,0 +1,37 @@
+# Link 3: the ingress data plane (envoy Deployment + LoadBalancer Service).
+# Phase 6's Gateway API `Gateway` attaches to this deployment via its
+# Service hostname (Istio "manual deployment" mode) instead of
+# auto-provisioning a second one.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: istio-gateway
+  namespace: istio-ingress
+spec:
+  interval: 30m
+  timeout: 10m
+  dependsOn:
+    - name: istiod
+      namespace: istio-system
+  chart:
+    spec:
+      chart: gateway
+      version: "1.30.x"
+      sourceRef:
+        kind: HelmRepository
+        name: istio
+        namespace: istio-system
+  values:
+    service:
+      type: LoadBalancer
+      annotations:
+        # In-tree AWS cloud controller: provision an NLB (lands in the
+        # public subnets tagged kubernetes.io/role/elb by terraform).
+        service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    # One replica, no HPA — cost over availability for a demo cluster.
+    autoscaling:
+      enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi

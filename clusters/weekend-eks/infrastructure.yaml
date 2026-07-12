@@ -6,7 +6,9 @@ metadata:
 spec:
   interval: 10m
   retryInterval: 2m
-  timeout: 5m
+  # First Istio install = 3 sequential HelmReleases + NLB provisioning;
+  # 5m is too tight with wait: true.
+  timeout: 10m
   sourceRef:
     kind: GitRepository
     name: flux-system

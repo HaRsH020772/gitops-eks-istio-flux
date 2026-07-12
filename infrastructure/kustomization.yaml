@@ -1,4 +1,5 @@
-# Populated in Phase 4 (Istio HelmRepository + HelmReleases).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-resources: []
+resources:
+  - crds
+  - istio
