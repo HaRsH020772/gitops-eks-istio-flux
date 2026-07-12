@@ -44,6 +44,25 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestHello(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/hello?name=flux", nil)
+	rec := httptest.NewRecorder()
+
+	newMux().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /hello: got status %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("GET /hello: response is not valid JSON: %v", err)
+	}
+	if body["message"] != "hello, flux!" {
+		t.Fatalf("GET /hello: got message %q, want %q", body["message"], "hello, flux!")
+	}
+}
+
 func TestUnknownPathIs404(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/nope", nil)
 	rec := httptest.NewRecorder()

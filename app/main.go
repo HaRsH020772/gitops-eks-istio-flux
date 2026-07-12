@@ -29,6 +29,18 @@ func newMux() *http.ServeMux {
 		_ = json.NewEncoder(w).Encode(map[string]string{"version": version})
 	})
 
+	mux.HandleFunc("GET /hello", func(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Query().Get("name")
+		if name == "" {
+			name = "world"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message":   "hello, " + name + "!",
+			"served_by": version,
+		})
+	})
+
 	return mux
 }
 
