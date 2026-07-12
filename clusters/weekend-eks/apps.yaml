@@ -15,3 +15,10 @@ spec:
   path: ./apps
   prune: true
   wait: true
+  # kustomize-controller decrypts SOPS-encrypted manifests natively using
+  # the age private key from the sops-age secret. That secret must exist
+  # BEFORE this block is pushed, or reconciliation fails.
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

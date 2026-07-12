@@ -6,3 +6,6 @@ backend.hcl
 crash.log
 *.tfplan
 .claude*
+
+# SOPS/age private keys — never commit
+*.agekey

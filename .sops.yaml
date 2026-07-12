@@ -1,0 +1,11 @@
+# SOPS creation rules: any file ending in .enc.yaml gets encrypted with age.
+# Only `data`/`stringData` values are encrypted — metadata stays readable so
+# kustomize can still process the manifest and git diffs stay meaningful.
+#
+# REPLACE the placeholder below with your real public key (the "age1..."
+# line printed by `age-keygen`). Public keys are safe to commit; the private
+# key (age.agekey) must never enter git.
+creation_rules:
+  - path_regex: .*\.enc\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1jsurcffsvmm0kxlee4pckxun4qep4qtw88g2qhelah3djt3my4uqrrlut7
