@@ -1,0 +1,60 @@
+# The three links that close the CI/CD loop: watch ECR → pick newest tag →
+# commit the bump to git. Flux then deploys the commit like any other.
+---
+# WHAT tags exist? Polls ECR. `provider: aws` = native ECR auth via the
+# IRSA role annotated onto the image-reflector-controller ServiceAccount
+# (see flux-system/kustomization.yaml patch) — no registry secrets.
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: demo-app
+  namespace: flux-system
+spec:
+  image: 989237246761.dkr.ecr.us-east-1.amazonaws.com/demo-app
+  interval: 1m
+  provider: aws
+---
+# WHICH tag wins? CI tags are main-<sha>-<unixtime>; extract the timestamp
+# and take the numerically largest. Manual tags like 0.1.0 don't match the
+# pattern and are simply ignored.
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  # Marker in deployment.yaml references this as flux-system:demo-app.
+  name: demo-app
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: demo-app
+  filterTags:
+    pattern: '^main-[a-fA-F0-9]+-(?P<ts>\d+)$'
+    extract: '$ts'
+  policy:
+    numerical:
+      order: asc
+---
+# WHO acts on it? Rewrites lines carrying {"$imagepolicy": ...} markers
+# under ./apps and pushes the commit to main over the read-write deploy key.
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: fluxcdbot
+        email: fluxcdbot@users.noreply.github.com
+    push:
+      branch: main
+  update:
+    path: ./apps
+    strategy: Setters

@@ -3,3 +3,19 @@ kind: Kustomization
 resources:
 - gotk-components.yaml
 - gotk-sync.yaml
+patches:
+  # IRSA: lets image-reflector-controller pull ECR auth tokens via the
+  # weekend-eks-image-reflector IAM role (Terraform, Phase 1) instead of
+  # stored registry credentials. Pod must be restarted once after this
+  # lands so the token gets projected in.
+  - patch: |
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: image-reflector-controller
+        namespace: flux-system
+        annotations:
+          eks.amazonaws.com/role-arn: arn:aws:iam::989237246761:role/weekend-eks-image-reflector
+    target:
+      kind: ServiceAccount
+      name: image-reflector-controller
