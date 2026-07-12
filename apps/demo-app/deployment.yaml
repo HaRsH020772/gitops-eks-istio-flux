@@ -19,7 +19,7 @@ spec:
         - name: demo-app
           # The trailing marker is what Phase 8's ImageUpdateAutomation
           # rewrites when a newer image lands in ECR.
-          image: 989237246761.dkr.ecr.us-east-1.amazonaws.com/demo-app:0.1.0 # {"$imagepolicy": "flux-system:demo-app"}
+          image: 989237246761.dkr.ecr.us-east-1.amazonaws.com/demo-app:main-f75cbca-1783859340 # {"$imagepolicy": "flux-system:demo-app"}
           ports:
             - name: http
               containerPort: 8080
