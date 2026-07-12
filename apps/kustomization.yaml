@@ -1,0 +1,4 @@
+# Populated in Phase 6 (demo-app Deployment/Service/Gateway/HTTPRoute).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: []

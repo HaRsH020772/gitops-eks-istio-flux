@@ -1,0 +1,18 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infrastructure
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 2m
+  timeout: 5m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./infrastructure
+  prune: true
+  # Ready only when everything applied (incl. HelmReleases) is healthy —
+  # this is what makes apps' dependsOn wait for Istio, not just for the
+  # manifests to be applied.
+  wait: true
