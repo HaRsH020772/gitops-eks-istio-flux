@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Interactive animated map of a GitOps pipeline: GitHub Actions, FluxCD, and Istio on EKS. Press git push and watch a commit travel to production.">
+<title>GitOps pipeline — weekend-eks</title>
+<style>
+  :root{
+    --bg:#eef1f6; --panel:#ffffff; --panel2:#f5f8fc; --line:#c9d4e2; --edge:#93a5bb;
+    --text:#1a2635; --muted:#5c6d82; --accent:#b06e0e; --accent-soft:#b06e0e22;
+    --ok:#177a4f; --ok-soft:#177a4f1a; --pulse:#d98d1f; --hub:#dfe7f1;
+    --mono:ui-monospace,'Cascadia Code','SF Mono',Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e1420; --panel:#16202f; --panel2:#121b28; --line:#26364e; --edge:#54677f;
+      --text:#d9e3f0; --muted:#8296ad; --accent:#f2a33c; --accent-soft:#f2a33c26;
+      --ok:#3ecf8e; --ok-soft:#3ecf8e1f; --pulse:#f2a33c; --hub:#1d2b3f;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1420; --panel:#16202f; --panel2:#121b28; --line:#26364e; --edge:#54677f;
+    --text:#d9e3f0; --muted:#8296ad; --accent:#f2a33c; --accent-soft:#f2a33c26;
+    --ok:#3ecf8e; --ok-soft:#3ecf8e1f; --pulse:#f2a33c; --hub:#1d2b3f;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f6; --panel:#ffffff; --panel2:#f5f8fc; --line:#c9d4e2; --edge:#93a5bb;
+    --text:#1a2635; --muted:#5c6d82; --accent:#b06e0e; --accent-soft:#b06e0e22;
+    --ok:#177a4f; --ok-soft:#177a4f1a; --pulse:#d98d1f; --hub:#dfe7f1;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);margin:0;padding:0}
+  .wrap{max-width:1280px;margin:0 auto;padding:28px 20px 48px}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px;justify-content:space-between;margin-bottom:18px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  h1{font-family:var(--mono);font-size:clamp(20px,3.4vw,30px);letter-spacing:-.02em;margin:0;text-wrap:balance}
+  h1 .dim{color:var(--muted);font-weight:400}
+  .sub{color:var(--muted);font-size:14px;max-width:62ch;margin:8px 0 0;line-height:1.5}
+  button#push{
+    font-family:var(--mono);font-size:14px;font-weight:600;color:var(--bg);
+    background:var(--accent);border:none;border-radius:6px;padding:11px 18px;cursor:pointer;
+    white-space:nowrap;transition:transform .12s ease, filter .12s ease;
+  }
+  button#push:hover{filter:brightness(1.08)}
+  button#push:active{transform:scale(.97)}
+  button#push:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+  button#push[disabled]{opacity:.55;cursor:default}
+  .pushwrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+  button#push:not(.clicked){animation:ring 2s ease-out infinite}
+  @keyframes ring{0%{box-shadow:0 0 0 0 var(--accent-soft),0 0 0 0 var(--accent-soft)}
+    60%{box-shadow:0 0 0 9px transparent,0 0 0 18px transparent}
+    100%{box-shadow:0 0 0 0 transparent,0 0 0 0 transparent}}
+  #hint{font:600 12px var(--mono);color:var(--accent);letter-spacing:.04em;
+    animation:bob 1.5s ease-in-out infinite;user-select:none}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  @media (prefers-reduced-motion: reduce){
+    button#push:not(.clicked){animation:none;box-shadow:0 0 0 3px var(--accent-soft)}
+    #hint{animation:none}
+  }
+  .board{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+  .board svg{display:block;min-width:1060px;width:100%;height:auto}
+
+  .node rect{fill:var(--panel2);stroke:var(--line);stroke-width:1.2;rx:7}
+  .node text{fill:var(--text)}
+  .node .t{font:600 14px var(--mono)}
+  .node .s{font:11.5px var(--mono);fill:var(--muted)}
+  .node{cursor:pointer}
+  .node:hover rect{stroke:var(--edge)}
+  .node:focus{outline:none}
+  .node:focus-visible rect{stroke:var(--accent);stroke-width:2}
+  .node.hub rect{fill:var(--hub);stroke-width:1.6}
+  .node.active rect{stroke:var(--pulse);stroke-width:2;filter:drop-shadow(0 0 6px var(--accent-soft))}
+  .node.done rect{stroke:var(--ok)}
+  .node.done .dot{fill:var(--ok)}
+  .dot{fill:transparent}
+
+  .chip rect{fill:var(--panel);stroke:var(--line);rx:4}
+  .chip text{font:10.5px var(--mono);fill:var(--muted)}
+  .chip.active rect{stroke:var(--pulse);fill:var(--accent-soft)}
+  .chip.active text{fill:var(--text)}
+  .chip.done rect{stroke:var(--ok);fill:var(--ok-soft)}
+  .chip.done text{fill:var(--text)}
+
+  .edge{stroke:var(--edge);stroke-width:1.6;fill:none}
+  .edge.dashed{stroke-dasharray:5 5}
+  .edge.lit{stroke:var(--ok)}
+  .zone{fill:none;stroke:var(--line);stroke-dasharray:7 6;rx:12}
+  .zonelabel{font:600 11px var(--mono);fill:var(--muted);letter-spacing:.14em;text-transform:uppercase}
+  #pulse{fill:var(--pulse);filter:drop-shadow(0 0 5px var(--pulse))}
+
+  .below{display:grid;grid-template-columns:minmax(320px,1.2fr) minmax(300px,1fr);gap:16px;margin-top:16px}
+  @media (max-width:820px){.below{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .card h2{font:600 12px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+  #log{font:12.5px/1.85 var(--mono);margin:0;padding:0;list-style:none;max-height:250px;overflow-y:auto}
+  #log li{display:flex;gap:10px}
+  #log .ts{color:var(--muted);flex:0 0 44px;text-align:right;font-variant-numeric:tabular-nums}
+  #log .ok{color:var(--ok)}
+  #log li.now{color:var(--accent)}
+  #detail .name{font:600 16px var(--mono);margin:0 0 2px}
+  #detail .role{color:var(--muted);font-size:13px;margin:0 0 12px}
+  #detail dl{margin:0;font-size:13px;line-height:1.55}
+  #detail dt{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:10px}
+  #detail dd{margin:2px 0 0;font-family:var(--mono);font-size:12.5px;word-break:break-word}
+  .facts{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .fact{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;flex:1 1 150px}
+  .fact b{display:block;font:600 17px var(--mono);font-variant-numeric:tabular-nums}
+  .fact span{font-size:11.5px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;font-family:var(--mono)}
+  footer{margin-top:22px;color:var(--muted);font-size:12.5px;font-family:var(--mono)}
+  footer a{color:var(--accent);text-decoration:none}
+  @media (prefers-reduced-motion: reduce){ #pulse{display:none} }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">weekend-eks · us-east-1 · GitHub Actions → FluxCD → Istio</p>
+      <h1>One git push, zero deploy commands<span class="dim"> — watch it travel</span></h1>
+      <p class="sub">Every box is a real component from the repo. Press the button to replay commit
+      <span style="font-family:var(--mono)">20d0cd1</span> ("Add GET /hello") end to end, or click any node for its actual configuration.</p>
+    </div>
+    <div class="pushwrap">
+      <button id="push">$ git push origin main</button>
+      <span id="hint" aria-hidden="true">↑ click me — watch the commit travel</span>
+    </div>
+  </header>
+
+  <div class="board">
+  <svg viewBox="0 0 1280 620" role="img" aria-label="Animated architecture map of the GitOps pipeline">
+    <defs>
+      <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L8,4 L0,8 z" fill="#8496ac"/>
+      </marker>
+    </defs>
+
+    <!-- zones -->
+    <rect class="zone" x="560" y="168" width="690" height="432" rx="12"/>
+    <text class="zonelabel" x="580" y="592">EKS cluster · weekend-eks</text>
+    <text class="zonelabel" x="300" y="14" >CI · GitHub Actions</text>
+    <text class="zonelabel" x="580" y="192">CD · Flux controllers, in-cluster</text>
+
+    <!-- edges (drawn under nodes) -->
+    <path id="e1"  class="edge" d="M200,190 L296,190" marker-end="url(#arr)"/>
+    <path id="e2"  class="edge" d="M352,150 L352,114" marker-end="url(#arr)"/>
+    <path id="e3"  class="edge" d="M530,65 L636,65" marker-end="url(#arr)"/>
+    <path id="e4"  class="edge" d="M740,110 L740,160 L690,160 L690,196" marker-end="url(#arr)"/>
+    <path id="e5"  class="edge" d="M780,240 L816,240" marker-end="url(#arr)"/>
+    <path id="e6"  class="edge" d="M1000,240 L1036,240" marker-end="url(#arr)"/>
+    <path id="e7"  class="edge" d="M1135,200 L1135,138 L440,138 L440,146" marker-end="url(#arr)"/>
+    <path id="e8"  class="edge" d="M395,240 L395,290 L690,290 L690,326" marker-end="url(#arr)"/>
+    <path id="e9"  class="edge" d="M780,375 L826,375" marker-end="url(#arr)"/>
+    <path id="e10" class="edge" d="M920,420 L920,466" marker-end="url(#arr)"/>
+    <path id="e11" class="edge" d="M830,510 L784,510" marker-end="url(#arr)"/>
+    <path id="e12" class="edge" d="M600,510 L204,510" marker-end="url(#arr)"/>
+    <path id="eS"  class="edge dashed" d="M600,360 L200,360" marker-end="url(#arr)"/>
+
+    <!-- nodes -->
+    <g class="node" id="n-dev" tabindex="0"><rect x="30" y="150" width="170" height="80" rx="7"/>
+      <circle class="dot" cx="46" cy="166" r="4"/>
+      <text class="t" x="48" y="186">You</text>
+      <text class="s" x="48" y="206">git push · the only</text>
+      <text class="s" x="48" y="220">manual step</text></g>
+
+    <g class="node hub" id="n-git" tabindex="0"><rect x="300" y="150" width="190" height="90" rx="7"/>
+      <circle class="dot" cx="316" cy="166" r="4"/>
+      <text class="t" x="318" y="186">GitHub · main</text>
+      <text class="s" x="318" y="206">gitops-eks-istio-flux</text>
+      <text class="s" x="318" y="220">single source of truth</text></g>
+
+    <g class="node" id="n-ci" tabindex="0"><rect x="300" y="20" width="230" height="90" rx="7"/>
+      <circle class="dot" cx="316" cy="36" r="4"/>
+      <text class="t" x="318" y="52">ci.yaml</text>
+      <g class="chip" id="c-test"><rect x="316" y="66" width="38" height="20"/><text x="322" y="80">test</text></g>
+      <g class="chip" id="c-build"><rect x="358" y="66" width="42" height="20"/><text x="364" y="80">build</text></g>
+      <g class="chip" id="c-scan"><rect x="404" y="66" width="40" height="20"/><text x="410" y="80">scan</text></g>
+      <g class="chip" id="c-push"><rect x="448" y="66" width="40" height="20"/><text x="454" y="80">push</text></g>
+      <g class="chip" id="c-sign"><rect x="492" y="66" width="36" height="20"/><text x="497" y="80">sign</text></g></g>
+
+    <g class="node" id="n-ecr" tabindex="0"><rect x="640" y="20" width="200" height="90" rx="7"/>
+      <circle class="dot" cx="656" cy="36" r="4"/>
+      <text class="t" x="658" y="52">ECR · demo-app</text>
+      <text class="s" x="658" y="72">immutable tags</text>
+      <text class="s" x="658" y="86">image + .sig artifact</text></g>
+
+    <g class="node" id="n-refl" tabindex="0"><rect x="600" y="200" width="180" height="80" rx="7"/>
+      <circle class="dot" cx="616" cy="216" r="4"/>
+      <text class="t" x="618" y="234">image-reflector</text>
+      <text class="s" x="618" y="252">polls ECR · 1m</text>
+      <text class="s" x="618" y="266">auth: IRSA, no keys</text></g>
+
+    <g class="node" id="n-pol" tabindex="0"><rect x="820" y="200" width="180" height="80" rx="7"/>
+      <circle class="dot" cx="836" cy="216" r="4"/>
+      <text class="t" x="838" y="234">ImagePolicy</text>
+      <text class="s" x="838" y="252">newest timestamp</text>
+      <text class="s" x="838" y="266">in main-*-N tags</text></g>
+
+    <g class="node" id="n-auto" tabindex="0"><rect x="1040" y="200" width="190" height="80" rx="7"/>
+      <circle class="dot" cx="1056" cy="216" r="4"/>
+      <text class="t" x="1058" y="234">ImageUpdate</text>
+      <text class="s" x="1058" y="252">rewrites marker line,</text>
+      <text class="s" x="1058" y="266">commits as fluxcdbot</text></g>
+
+    <g class="node" id="n-kust" tabindex="0"><rect x="600" y="330" width="180" height="90" rx="7"/>
+      <circle class="dot" cx="616" cy="346" r="4"/>
+      <text class="t" x="618" y="364">Flux kustomize</text>
+      <text class="s" x="618" y="382">applies main</text>
+      <text class="s" x="618" y="396">SOPS decrypt in-cluster</text></g>
+
+    <g class="node" id="n-app" tabindex="0"><rect x="830" y="330" width="180" height="90" rx="7"/>
+      <circle class="dot" cx="846" cy="346" r="4"/>
+      <text class="t" x="848" y="364">demo-app</text>
+      <text class="s" x="848" y="382">2 pods · rolling update</text>
+      <text class="s" x="848" y="396">istio sidecars</text></g>
+
+    <g class="node" id="n-gw" tabindex="0"><rect x="830" y="470" width="180" height="80" rx="7"/>
+      <circle class="dot" cx="846" cy="486" r="4"/>
+      <text class="t" x="848" y="504">public-gateway</text>
+      <text class="s" x="848" y="522">Gateway API · HTTP :80</text>
+      <text class="s" x="848" y="536">HTTPRoute → service</text></g>
+
+    <g class="node" id="n-nlb" tabindex="0"><rect x="600" y="470" width="180" height="80" rx="7"/>
+      <circle class="dot" cx="616" cy="486" r="4"/>
+      <text class="t" x="618" y="504">AWS NLB</text>
+      <text class="s" x="618" y="522">public subnets</text>
+      <text class="s" x="618" y="536">stable endpoint</text></g>
+
+    <g class="node" id="n-user" tabindex="0"><rect x="30" y="470" width="174" height="80" rx="7"/>
+      <circle class="dot" cx="46" cy="486" r="4"/>
+      <text class="t" x="48" y="504">Internet</text>
+      <text class="s" x="48" y="522">curl /version</text>
+      <text class="s" x="48" y="536">sees the new build</text></g>
+
+    <g class="node" id="n-slack" tabindex="0"><rect x="30" y="320" width="174" height="80" rx="7"/>
+      <circle class="dot" cx="46" cy="336" r="4"/>
+      <text class="t" x="48" y="354">Slack</text>
+      <text class="s" x="48" y="372">notification-controller</text>
+      <text class="s" x="48" y="386">webhook: SOPS secret</text></g>
+
+    <circle id="pulse" r="6" opacity="0"/>
+  </svg>
+  </div>
+
+  <div class="below">
+    <div class="card"><h2>Pipeline log</h2><ul id="log"><li><span class="ts">--:--</span><span>Press "git push" to replay the run.</span></li></ul></div>
+    <div class="card" id="detail"><h2>Component</h2>
+      <p class="name">Click any node</p>
+      <p class="role">Each card shows the component's real configuration from the repo.</p>
+    </div>
+  </div>
+
+  <div class="facts">
+    <div class="fact"><b>~4 min</b><span>push → live</span></div>
+    <div class="fact"><b>0</b><span>stored credentials</span></div>
+    <div class="fact"><b>2</b><span>loops, git in the middle</span></div>
+    <div class="fact"><b>$0.35/hr</b><span>full stack cost</span></div>
+  </div>
+
+  <footer>source: <a href="https://github.com/HaRsH020772/gitops-eks-istio-flux">github.com/HaRsH020772/gitops-eks-istio-flux</a> · CI never touches the cluster; the cluster only reads git.</footer>
+</div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const details={
+    'n-dev':{n:'Developer',r:'The whole human interface of the pipeline.',d:{'action':'git push origin main','everything after':'automated'}},
+    'n-git':{n:'GitHub · main',r:'Single source of truth. Both loops meet here: CI reads code from it, CD reads manifests from it, automation writes back to it.',d:{'repo':'HaRsH020772/gitops-eks-istio-flux','flux path':'clusters/weekend-eks','write access':'read-write deploy key (bootstrap --read-write-key)'}},
+    'n-ci':{n:'GitHub Actions · ci.yaml',r:'Builds a trusted artifact, then stops. Has zero access to the cluster.',d:{'auth to AWS':'OIDC federation → role github-actions-ecr-push, scoped to this repo, branch main','gate':'Trivy fails job on CRITICAL/HIGH (it once rejected a Go 1.24 stdlib build)','trigger filter':'app/** only — Flux bump commits to apps/** never retrigger CI'}},
+    'n-ecr':{n:'ECR · demo-app',r:'The registry. Holds the image and its cosign signature side by side.',d:{'tags':'main-<sha>-<unixtime>, immutable','signature':'sha256-<digest>.sig · keyless via Sigstore','hygiene':'scan-on-push, keep newest 10 images'}},
+    'n-refl':{n:'image-reflector-controller',r:'Discovers what exists in the registry. Never deploys anything.',d:{'CR':'ImageRepository, interval 1m, provider: aws','auth':'IRSA role weekend-eks-image-reflector (ECR read-only), trust = exactly one ServiceAccount','stored secrets':'none'}},
+    'n-pol':{n:'ImagePolicy · flux-system:demo-app',r:'Chooses the winner among discovered tags.',d:{'filter':"^main-[a-fA-F0-9]+-(?P<ts>\\d+)$ → extract $ts",'policy':'numerical, highest timestamp wins','manual tags':'0.1.0 never matches — only CI output is eligible'}},
+    'n-auto':{n:'ImageUpdateAutomation',r:'The only component allowed to write to git.',d:{'edit':'the one line carrying # {"$imagepolicy": "flux-system:demo-app"}','commit author':'fluxcdbot','push':'main, over the deploy key'}},
+    'n-kust':{n:'Flux kustomize-controller',r:'Applies whatever main says, every minute. Deleting from git deletes from the cluster (prune).',d:{'ordering':'apps dependsOn infrastructure + wait: true (healthy, not just applied)','secrets':'SOPS/age decryption via sops-age key — private key never leaves the cluster'}},
+    'n-app':{n:'demo-app Deployment',r:'The workload. Its /version endpoint bakes in the image tag, which is how the pipeline is verified.',d:{'replicas':'2, rolling update, zero downtime','mesh':'istio-injection: enabled (2/2 containers)','image line':'…/demo-app:main-20d0cd1-1783862890 # {"$imagepolicy": …}'}},
+    'n-gw':{n:'public-gateway · Istio',r:'Gateway API Gateway attached to the Helm-installed envoy ("manual deployment" mode) instead of auto-provisioning a second one.',d:{'listener':'HTTP :80, routes allowed from all namespaces','attach':'addresses → istio-gateway.istio-ingress.svc.cluster.local','hard-won lesson':'EKS node SG must allow API-server → istiod :15017'}},
+    'n-nlb':{n:'AWS Network Load Balancer',r:'Created by Kubernetes for the gateway Service — Terraform does not know it exists (delete the Service before terraform destroy).',d:{'subnets':'public, tagged kubernetes.io/role/elb by Terraform','endpoint':'stable across deployments'}},
+    'n-user':{n:'The internet',r:'The proof. Four-ish minutes after the push, the response changes.',d:{'request':'GET /version','response':'{"version":"main-20d0cd1-1783862890"}'}},
+    'n-slack':{n:'Slack · #flux-alerts',r:'Flux narrates itself: one Provider + one Alert over every Kustomization and HelmRelease.',d:{'webhook':'first real SOPS-encrypted secret (slack-webhook.enc.yaml)','severity':'info while learning, error once trusted'}}
+  };
+
+  const detail=$('detail');
+  function showDetail(id){
+    const c=details[id]; if(!c) return;
+    let dl='';
+    for(const k in c.d) dl+='<dt>'+k+'</dt><dd>'+c.d[k]+'</dd>';
+    detail.innerHTML='<h2>Component</h2><p class="name">'+c.n+'</p><p class="role">'+c.r+'</p><dl>'+dl+'</dl>';
+  }
+  document.querySelectorAll('.node').forEach(n=>{
+    n.addEventListener('click',()=>showDetail(n.id));
+    n.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();showDetail(n.id);}});
+  });
+
+  const seq=[
+    {node:'n-dev',                 t:'0:00', log:'$ git push origin main · 20d0cd1 "Add GET /hello"'},
+    {edge:'e1', node:'n-git',      t:'0:02', log:'GitHub: main is now 20d0cd1'},
+    {edge:'e2', node:'n-ci', chip:'c-test',  t:'0:15', log:'CI: go vet + go test — pass'},
+    {chip:'c-build',               t:'0:58', log:'CI: image built · VERSION=main-20d0cd1-1783862890'},
+    {chip:'c-scan',                t:'1:26', log:'CI: Trivy gate · 0 CRITICAL/HIGH — allowed to publish'},
+    {edge:'e3', node:'n-ecr', chip:'c-push', t:'1:40', log:'ECR: pushed main-20d0cd1-1783862890 (immutable)'},
+    {chip:'c-sign',                t:'1:47', log:'cosign: signed by digest → sha256-13d4c….sig (keyless)'},
+    {edge:'e4', node:'n-refl',     t:'2:20', log:'image-reflector: new tag found · IRSA, no stored creds'},
+    {edge:'e5', node:'n-pol',      t:'2:21', log:'ImagePolicy: 1783862890 > 1783859340 → new winner'},
+    {edge:'e6', node:'n-auto',     t:'2:24', log:'ImageUpdateAutomation: rewriting deployment.yaml marker'},
+    {edge:'e7', node:'n-git',      t:'2:29', log:'git: commit dea9d1c authored by fluxcdbot'},
+    {edge:'e8', node:'n-kust',     t:'2:58', log:'Flux: applying main@dea9d1c · SOPS secrets decrypted'},
+    {edge:'eS', node:'n-slack',    t:'2:59', log:'Slack: ✓ apps reconciled main@dea9d1c', keep:'n-kust'},
+    {edge:'e9', node:'n-app', from:'n-kust', t:'3:20', log:'Deployment: rolling update · 2/2 pods, sidecars injected'},
+    {edge:'e10',node:'n-gw',       t:'3:40', log:'HTTPRoute → public-gateway: routing to new pods'},
+    {edge:'e11',node:'n-nlb',      t:'3:42', log:'AWS NLB: same endpoint, new backend'},
+    {edge:'e12',node:'n-user',     t:'3:55', log:'curl /version → {"version":"main-20d0cd1-1783862890"}', ok:true}
+  ];
+
+  const log=$('log'), pulse=$('pulse'), btn=$('push');
+  let running=false;
+
+  function addLog(step){
+    const li=document.createElement('li');
+    li.innerHTML='<span class="ts">'+step.t+'</span><span'+(step.ok?' class="ok"':'')+'></span>';
+    li.lastChild.textContent=step.log; li.className='now';
+    log.querySelectorAll('li').forEach(x=>x.classList.remove('now'));
+    log.appendChild(li); log.scrollTop=log.scrollHeight;
+  }
+  function setNode(id,cls){const n=$(id); if(n){n.classList.remove('active'); if(cls)n.classList.add(cls);}}
+  function reset(){
+    log.innerHTML='';
+    document.querySelectorAll('.node').forEach(n=>n.classList.remove('active','done'));
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active','done'));
+    document.querySelectorAll('.edge').forEach(e=>e.classList.remove('lit'));
+    pulse.setAttribute('opacity','0');
+  }
+  function travel(edgeId,ms){
+    return new Promise(res=>{
+      const path=$(edgeId);
+      if(!path||reduced){ if(path)path.classList.add('lit'); return res(); }
+      const len=path.getTotalLength(); let t0=null;
+      pulse.setAttribute('opacity','1');
+      function frame(ts){
+        if(!t0)t0=ts;
+        const p=Math.min((ts-t0)/ms,1);
+        const pt=path.getPointAtLength(len*p);
+        pulse.setAttribute('cx',pt.x); pulse.setAttribute('cy',pt.y);
+        if(p<1) requestAnimationFrame(frame);
+        else{ path.classList.add('lit'); pulse.setAttribute('opacity','0'); res(); }
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+  const wait=ms=>new Promise(r=>setTimeout(r,reduced?60:ms));
+
+  async function run(){
+    if(running)return; running=true; btn.disabled=true; reset();
+    btn.classList.add('clicked');
+    const h=$('hint'); if(h)h.remove();
+    let prevNode=null;
+    for(const step of seq){
+      if(step.edge) await travel(step.edge, step.edge==='e7'?1300:(step.edge==='e12'?900:650));
+      if(prevNode && step.node && prevNode!==step.node) setNode(prevNode,'done');
+      if(step.keep) setNode(step.keep,'done');
+      if(step.node){ const n=$(step.node); n.classList.remove('done'); n.classList.add('active'); prevNode=step.node; }
+      if(step.chip){
+        const c=$(step.chip);
+        document.querySelectorAll('.chip.active').forEach(x=>{x.classList.remove('active');x.classList.add('done');});
+        c.classList.add('active');
+      }
+      addLog(step); showDetail(step.node||'n-ci');
+      await wait(step.chip&&!step.edge?820:520);
+    }
+    document.querySelectorAll('.chip.active').forEach(x=>{x.classList.remove('active');x.classList.add('done');});
+    if(prevNode) setNode(prevNode,'done');
+    running=false; btn.disabled=false;
+  }
+  btn.addEventListener('click',run);
+})();
+</script>
+</body>
+</html>
